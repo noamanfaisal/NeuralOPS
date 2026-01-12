@@ -1,0 +1,9 @@
+[submodule "backend"]
+	path = backend
+	url = git@personal_github:noamanfaisal/neuralops-backend.git
+[submodule "terminal-app"]
+	path = terminal-app
+	url = git@personal_github:noamanfaisal/neuralops-terminal-app.git
+[submodule "frontend-web"]
+	path = frontend-web
+	url = git@personal_github:noamanfaisal/neuralops-frontend-web.git
