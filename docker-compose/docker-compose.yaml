@@ -1,0 +1,79 @@
+version: "3.9"
+
+services:
+  # ==========================================
+  # 1. The Brain (Backend API)
+  # ==========================================
+  backend:
+    container_name: neuralops-backend
+    build:
+      context: .                  # Root context to see symlinks & all folders
+      dockerfile: docker/Dockerfile
+    restart: always
+    stdin_open: true
+    tty: true
+    
+    ports:
+      - "${HOST_PORT:-8000}:8000"
+      
+    volumes:
+      # SYNC CODE: Local backend folder -> Container folder
+      - ./backend:/home/ubuntu/neuralops_backend:rw
+
+      # PERSIST VENV: Keep python packages installed between restarts
+      - neuralops-venv-data:/opt/envs
+
+      # SSH KEYS (Read-Only): For cloning private repos later
+      # ⚠️ UPDATE THE FILENAME below to match your actual key file!
+      - ${HOME}/.ssh/personal_github_id_ed25519:/home/ubuntu/.ssh/id_rsa:ro
+      - ${HOME}/.ssh/config:/home/ubuntu/.ssh/config:ro
+      - ${HOME}/.ssh/known_hosts:/home/ubuntu/.ssh/known_hosts:ro
+
+    # Ensure we run from the correct directory inside
+    working_dir: /home/ubuntu/neuralops_backend
+
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENV=development
+      # SQLite Database (Stored inside the mounted volume so it persists)
+      - DATABASE_URL=sqlite:////home/ubuntu/neuralops_backend/neuralops.db
+    
+    # Hot-Reload Command
+    command: /opt/envs/neuralops_backend/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # ==========================================
+  # 2. The Memory (Vector Database)
+  # ==========================================
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: neuralops-chroma
+    ports:
+      - "8001:8000" # Mapped to 8001 on host
+    volumes:
+      - ./chroma_data:/chroma/chroma
+
+  # ==========================================
+  # 3. The Face (Web UI)
+  # ==========================================
+  frontend:
+    container_name: neuralops-frontend
+    build:
+      context: .
+      dockerfile: docker/frontend/Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend-web:/app
+      - /app/node_modules # Prevent host node_modules from breaking container
+      - /app/.next        # Prevent host build artifacts from breaking container
+    environment:
+      # Browser -> API (Browser can access localhost:8000)
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - backend
+
+# ==========================================
+# Persistent Volumes
+# ==========================================
+volumes:
+  neuralops-venv-data:
