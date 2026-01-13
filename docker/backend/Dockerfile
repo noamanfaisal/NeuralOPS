@@ -44,7 +44,7 @@ WORKDIR /home/ubuntu/neuralops_backend/
 
 # 🔴 FIX: Point to the symlink you created inside docker/backend/
 # The context is root (.), so we path down to docker/backend/requirements.txt
-COPY docker/backend/requirements.txt .
+COPY backend/requirements.txt .
 
 RUN pip install --no-cache-dir -r requirements.txt
 
