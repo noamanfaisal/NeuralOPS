@@ -4,9 +4,9 @@ ENV LANG=C.UTF-8 LC_ALL=C.UTF-8
 ENV TZ="UTC"
 
 # ==========================
-# 1. Base OS + Tools
+# 1. Base OS + Tools (Run as Root)
 # ==========================
-# Added 'git' and 'python3-venv' explicitly to ensure 3.12 venv works
+# We install all system tools FIRST, before switching users
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         wget net-tools curl build-essential neovim ssh gcc openssh-server \
@@ -21,39 +21,40 @@ RUN id -u ubuntu &>/dev/null || adduser --disabled-password --gecos '' ubuntu &&
     echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
     chmod a+rwx /home/ubuntu/
 
-# Prepare directories
+# Create the backend folder structure
 RUN mkdir -p /opt/envs && chown ubuntu:ubuntu /opt/envs
-RUN mkdir -p /home/ubuntu/neuralops_backend && chown -R ubuntu:ubuntu /home/ubuntu/neuralops_backend
+RUN mkdir -p /home/ubuntu/backend && chown -R ubuntu:ubuntu /home/ubuntu/backend
 
+# ==========================
+# 3. Switch to User 'ubuntu'
+# ==========================
 USER ubuntu
 WORKDIR /home/ubuntu
 
 # ==========================
-# 3. Python Environment
+# 4. Python Environment
 # ==========================
-# Create the venv
+# Create the virtual environment
 RUN python3 -m venv /opt/envs/neuralops_backend
 
-# Activate venv for all future commands
+# Activate venv for all future commands (Path update)
 ENV PATH="/opt/envs/neuralops_backend/bin:${PATH}"
 
 # ==========================
-# 4. Dependencies (The Fix)
+# 5. Application Dependencies
 # ==========================
-WORKDIR /home/ubuntu/neuralops_backend/
+WORKDIR /home/ubuntu/backend/
 
-# 🔴 FIX: Point to the symlink you created inside docker/backend/
-# The context is root (.), so we path down to docker/backend/requirements.txt
+# Copy requirements from the context
 COPY backend/requirements.txt .
 
+# Install Python packages
 RUN pip install --no-cache-dir -r requirements.txt
 
-# # ==========================
-# # 5. Runtime
-# # ==========================
-# # We expose the port typically used by FastAPI
+# ==========================
+# 6. Runtime Configuration
+# ==========================
 # EXPOSE 8000
 
-# # Default command if docker-compose doesn't override it
-# # (Though your docker-compose command will likely take precedence)
+# # Default command (overridden by docker-compose)
 # CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]

@@ -1,0 +1,57 @@
+# version: "3.9"
+
+services:
+  # ... (Backend remains the same) ...
+  backend:
+    container_name: neuralops-backend
+    image: neuralops-backend:2.0
+    restart: always
+    stdin_open: true
+    tty: true
+    env_file:
+      - docker-compose.env
+    ports:
+      - "${HOST_PORT:-8000}:8000"
+    volumes:
+      - ./backend:/home/ubuntu/backend:rw
+      - neuralops-venv-data:/opt/envs
+      # 2. 🟢 THE FIX: Mount the hidden git history exactly where the pointer looks for it
+      # HOST PATH (Your laptop)       ->   CONTAINER PATH (Inside Docker)
+      - ./.git/modules/backend:/home/ubuntu/.git/modules/backend
+      # SSH Keys...
+      - ${HOME}/.ssh/personal_github_id_ed25519:/home/ubuntu/.ssh/personal_github_id_ed25519:ro
+      - ${HOME}/.ssh/config:/home/ubuntu/.ssh/config:ro
+      - ${HOME}/.ssh/known_hosts:/home/ubuntu/.ssh/known_hosts:ro
+    working_dir: /home/ubuntu/backend
+    environment:
+      - PYTHONUNBUFFERED=1
+      - ENV=development
+      # Note: SQLite file is still in the code folder (bind mount) which is fine for simple files
+      - DATABASE_URL=sqlite:////home/ubuntu/backend/neuralops.db
+    # command: /opt/envs/neuralops_backend/bin/uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # 🟢 NEW: Just sleep forever so we can debug manually
+    command: tail -f /dev/null
+
+  # ==========================================
+  # 2. The Memory (Vector Database)
+  # ==========================================
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: neuralops-chroma
+    ports:
+      - "8001:8000"
+    volumes:
+      # 🔴 OLD: Bind Mount (Folder on laptop)
+      # - ./chroma_data:/chroma/chroma
+      
+      # 🟢 NEW: Named Volume (Managed by Docker)
+      - neuralops-chroma-data:/chroma/chroma
+
+  # ... (Frontend remains the same) ...
+
+# ==========================================
+# Persistent Volumes Definition
+# ==========================================
+volumes:
+  neuralops-venv-data:    # Stores Python Libraries
+  neuralops-chroma-data:  # Stores Vector Embeddings (New!)
